@@ -57,24 +57,40 @@ router.get('/', async (req, res, next) => {
 // Create meeting and invite users
 router.get('/create', async (req, res, next) => {
 
-  // Pre defined users
+  // Get user id from call
+  // const userUID = req.authId
   const userUID = "asdjawdjawdg"
-  const user1 = {
-    name: "Dogecoin",
-    hasOutlook: true,
-    date: admin.firestore.FieldValue.serverTimestamp()
+
+  // Meeting details (POST Data)
+  const coords = new admin.firestore.GeoPoint(51.4701422,5.4174171)
+  const data = {
+    invitedUsers: [
+      "rgasdasdzas",
+      "hcvbsdfyjrt",
+    ],
+    meetingDetails: {
+      time: "Sometime",
+      ownerUID: userUID,
+      geolocation: [
+        {
+          coords
+        }
+      ]
+    }
   }
 
-  const user2UID = "rgasdasdzas"
-  const user3UID = "hcvbsdfyjrt"
+  var ownerRef = await db.collection('users_testing').doc(userUID).get()
+
+  if(!ownerRef.exists) {
+    return res.send("No person information")
+  }
 
 
-  // Pre defined meeting
-  const coords = new admin.firestore.GeoPoint(51.4701422,5.4174171)
+  // Create meeting details
   const meeting = {
     time: "Sometime",
     ownerUID: userUID,
-    ownerName: user1.name,
+    ownerName: ownerRef.data().name,
     geolocation: [
       {
         coords
@@ -84,54 +100,39 @@ router.get('/create', async (req, res, next) => {
   var ref = await db.collection('meetings_testing').add(meeting);
 
 
+  const userInvites = db.batch()
+
   // Add invited users to meeting
-
-  var snapshotUser = await db.collection('users_testing').doc(user2UID).get()
-  var snapshotUser2 = await db.collection('users_testing').doc(user3UID).get()
-
-
-  await db.collection('meetings_testing').doc(ref.id).collection('invitedUsers').doc(user2UID).set({
-    name: snapshotUser.data().name
-  })
-
-  await db.collection('meetings_testing').doc(ref.id).collection('invitedUsers').doc(user3UID).set({
-    name: snapshotUser2.data().name
-  })
-
-  // Add meeting to invited users
+  await Promise.all(data.invitedUsers.map(async (user) => {
+    var snapshotUser = await db.collection('users_testing').doc(user).get()
+    userInvites.set(db.collection('meetings_testing').doc(ref.id).collection('invitedUsers').doc(user), {name: snapshotUser.data().name})
+  }))
 
 
-  // 1st invitiation
-  await db.collection('users_testing').doc(user2UID).collection('meetings').doc(ref.id).set({
-    ownerUID: meeting.ownerUID,
-    ownerName: meeting.ownerName,
-    time: meeting.time,
-    geolocation: meeting.geolocation,
-  })
+  // Add calling user to invited user list
+  data.invitedUsers.push(userUID)
 
-  await db.collection('users_testing').doc(user2UID).collection('meetings').doc(ref.id).collection('invitedUsers').doc(user2UID).set({
-    name: snapshotUser.data().name
-  })
+  // Add meetings (w/invited users) to users
+  await Promise.all(data.invitedUsers.map(async (user) => {
+    userInvites.set(db.collection('users_testing').doc(user).collection('meetings').doc(ref.id), {
+      ownerUID: meeting.ownerUID,
+      ownerName: meeting.ownerName,
+      time: meeting.time,
+      geolocation: meeting.geolocation,
+    })
 
-  await db.collection('users_testing').doc(user2UID).collection('meetings').doc(ref.id).collection('invitedUsers').doc(user3UID).set({
-    name: snapshotUser2.data().name
-  })
+    await Promise.all(data.invitedUsers.map(async (innerUser) => {
+      var snapshotUser = await db.collection('users_testing').doc(innerUser).get()
+      userInvites.set(db.collection('users_testing').doc(user).collection('meetings').doc(ref.id).collection('invitedUsers').doc(innerUser), {
+        name: snapshotUser.data().name
+      })
+    }))
+  }))
 
-  // 2nd invitiation
-  await db.collection('users_testing').doc(user3UID).collection('meetings').doc(ref.id).set({
-    ownerUID: meeting.ownerUID,
-    ownerName: meeting.ownerName,
-    time: meeting.time,
-    geolocation: meeting.geolocation,
-  })
 
-  await db.collection('users_testing').doc(user3UID).collection('meetings').doc(ref.id).collection('invitedUsers').doc(user2UID).set({
-    name: snapshotUser.data().name
-  })
+  await userInvites.commit();
 
-  await db.collection('users_testing').doc(user3UID).collection('meetings').doc(ref.id).collection('invitedUsers').doc(user3UID).set({
-    name: snapshotUser2.data().name
-  })
+
 
   res.send('Created document')
 });
