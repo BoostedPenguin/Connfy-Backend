@@ -87,46 +87,47 @@ router.post('/add', async (req, res, next) => {
 
 //Update a Meeting
 router.put('/update/:id', async (req, res, next) =>{
-    const ownerUID = 'asdjawdjawdg';
-    const query = db.collection('users_testing').doc(ownerUID).collection('meetings').doc(req.params.id);
+    const query = db.collection('users_testing').doc('asdjawdjawdg').collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
 
     if(querySnapshot.exists){
         let result = querySnapshot.data();
-        console.log(result)
-        // if(result.meetingDetails.ownerUID === "asdjawdjawdg"){
-        //     const batch = db.batch();
-        //
-        //     const data = {
-        //         meetingDetails: {
-        //             time: req.body.time,
-        //             ownerUID: req.body.ownerUID,
-        //         }
-        //     }
-        //     const meetingRef = db.collection('meetings_testing').doc();
-        //     batch.set(meetingRef ,data.meetingDetails)
-        //
-        //     const usersRef = db.collection('users_testing').doc(req.body.ownerUID).collection('meetings').doc(meetingRef.id)
-        //     batch.set(usersRef, data.meetingDetails)
-        //
-        //     await Promise.all(
-        //         req.body.invitedUsers.map(async (uid)=>{
-        //             var userSnapshot = await db.collection('users_testing').doc(uid).get()
-        //             const invitedUsersUCRef = db.collection('users_testing').doc(req.body.ownerUID).collection('meetings').doc(meetingRef.id).collection('invitedUsers').doc(uid)
-        //             batch.set(invitedUsersUCRef, {name: userSnapshot.data().name})
-        //             const invitedUsersMCRef = db.collection('meetings_testing').doc(meetingRef.id).collection('invitedUsers').doc(uid)
-        //             batch.set(invitedUsersMCRef, {name: userSnapshot.data().name})
-        //         })
-        //     ).catch(()=>{
-        //         res.send("Error inviting users")
-        //     })
-        //     await batch.commit();
-        //     await db.collection('meetings_testing').doc(req.params.id).set(req.body)
-        //     await db.collection('users_testing').doc('asdjawdjawdg').collection('meetings').doc(req.params.id).set(req.body)
-        //     res.send('Meeting Updated!');
-        // }else{
-        //     res.send('Not Authorized to edit this meeting')
-        // }
+
+        if(result.ownerUID === "hcvbsdfyjrt"){
+            const data = {
+                meetingDetails: {
+                    title : req.body.title,
+                    description : req.body.description,
+                    ownerUID : req.body.ownerUID,
+                    ownerName : req.body.ownerName,
+                    time : req.body.time,
+                    geoLocation : req.body.geoLocation
+                },
+                invitedUsers: req.body.invitedUsers
+            }
+           await db.collection('meetings_testing').doc(req.params.id).set(data.meetingDetails)
+
+            await Promise.all(data.invitedUsers.map(async (uid) => {
+                var userSnapshot = await db.collection('users_testing').doc(uid).get()
+                await db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers').doc(uid).set({name:userSnapshot.data().name})
+            }))
+
+            data.invitedUsers.push(data.meetingDetails.ownerUID);
+
+            await Promise.all(data.invitedUsers.map(async (uid) => {
+                await db.collection('users_testing').doc(uid).collection('meetings').doc(req.params.id).set(data.meetingDetails);
+
+                await Promise.all(data.invitedUsers.map(async (uid1) => {
+                    var userSnapshot = await db.collection('users_testing').doc(uid1).get();
+                    await db.collection('users_testing').doc(uid).collection('meetings').doc(req.params.id).collection('invitedUsers').doc(uid1).set({
+                        name: userSnapshot.data().name
+                    })
+                }))
+            }))
+            res.send('Meeting Updated!')
+        }else{
+            res.send('Not Authorized to modify this meeting')
+        }
     }else{
         res.send('No Result Found')
     }
