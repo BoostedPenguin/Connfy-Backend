@@ -25,24 +25,29 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
     const query = db.collection('users_testing').doc('asdjawdjawdg').collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
+    const query1 = db.collection('users_testing').doc('asdjawdjawdg').collection('meetings').doc(req.params.id).collection('invitedUsers');
+    const querySnapshot1 = await query1.get();
 
     if(querySnapshot.exists){
-        let result_id = querySnapshot.id
-        let result = querySnapshot.data();
+            let result_id = querySnapshot.id
+            let result = querySnapshot.data();
+
         const data = {
-            id: result_id,
-            meetingData: result
-        }
-            //res.send(data)
-        if(data.meetingData.invitedUsers.includes(req.authId) || data.meetingData.meetingDetails.ownerUID === "asdjawdjawdg"){
-            console.log(data);
-            res.send(data);
+                    id: result_id,
+                    meetingData: result,
+                    invitedUsers: []
+                }
+        querySnapshot1.forEach(uid=>{
+            data.invitedUsers.push(uid.id, uid.data())
+        })
+        if(data.invitedUsers.includes("dawg") || data.meetingData.ownerUID === "hcvbsdfyjrt"){
+            res.send(data)
         }else{
             res.send('Not Authorized to access this meeting')
         }
     }else{
-        res.send('No Result Found')
-    }
+            res.send('No Result Found')
+        }
 });
 
 //Adding a new Meeting
