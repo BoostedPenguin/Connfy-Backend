@@ -4,8 +4,8 @@ var router = express.Router()
 var checkIfAuthenticated = require('../middlewares/authentication_middleware');
 
 //Get All Meetings
-router.get('/', async (req, res, next) => {
-    const query = db.collection('users_testing').doc('asdjawdjawdg').collection('meetings');
+router.get('/', checkIfAuthenticated, async (req, res, next) => {
+    const query = db.collection('users_testing').doc(req.authId).collection('meetings');
     const querySnapshot = await query.get();
 
     let result = [];
@@ -22,10 +22,10 @@ router.get('/', async (req, res, next) => {
 });
 
 //Get Meeting by ID
-router.get('/:id', async (req, res, next) => {
-    const query = db.collection('users_testing').doc('asdjawdjawdg').collection('meetings').doc(req.params.id);
+router.get('/:id', checkIfAuthenticated, async (req, res, next) => {
+    const query = db.collection('users_testing').doc(req.authId).collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
-    const query1 = db.collection('users_testing').doc('asdjawdjawdg').collection('meetings').doc(req.params.id).collection('invitedUsers');
+    const query1 = db.collection('users_testing').doc(req.authId).collection('meetings').doc(req.params.id).collection('invitedUsers');
     const querySnapshot1 = await query1.get();
 
     if(querySnapshot.exists){
@@ -40,7 +40,7 @@ router.get('/:id', async (req, res, next) => {
         querySnapshot1.forEach(uid=>{
             data.invitedUsers.push(uid.id, uid.data())
         })
-        if(data.invitedUsers.includes("dawg") || data.meetingData.ownerUID === "hcvbsdfyjrt"){
+        if(data.invitedUsers.includes(req.authId) || data.meetingData.ownerUID === req.authId){
             res.send(data)
         }else{
             res.send('Not Authorized to access this meeting')
@@ -51,7 +51,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 //Adding a new Meeting
-router.post('/add', async (req, res, next) => {
+router.post('/add', checkIfAuthenticated, async (req, res, next) => {
     const data = {
         meetingDetails: {
             title : req.body.title,
@@ -86,14 +86,14 @@ router.post('/add', async (req, res, next) => {
 });
 
 //Update a Meeting
-router.put('/update/:id', async (req, res, next) =>{
-    const query = db.collection('users_testing').doc('asdjawdjawdg').collection('meetings').doc(req.params.id);
+router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
+    const query = db.collection('users_testing').doc(req.authId).collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
 
     if(querySnapshot.exists){
         let result = querySnapshot.data();
 
-        if(result.ownerUID === "hcvbsdfyjrt"){
+        if(result.ownerUID === req.authId){
             const data = {
                 meetingDetails: {
                     title : req.body.title,
@@ -135,8 +135,50 @@ router.put('/update/:id', async (req, res, next) =>{
 
 //Delete a Meeting
 router.delete('/delete/:id', async (req, res, next) =>{
-    await db.collection('meetings_testing').doc(req.params.id).delete()
-    res.send('Meeting successfully deleted')
+    // const userMeetingsSnapshot = await db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers').get()
+    // await Promise.all(
+    //     userMeetingsSnapshot.forEach(async (uid)=>{
+    //         await deleteCollection(db.collection('users_testing').doc(uid.id).collection('meetings').doc(req.params.id).collection('invitedUsers'), 15)
+    //         await db.collection('users_testing').doc(uid.id).collection('meetings').doc(req.params.id).delete()
+    //     })
+    // )
+    // await deleteCollection(db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers'), 15)
+    // await db.collection('meetings_testing').doc(req.params.id).delete()
+    // await deleteCollection(db.collection('users_testing').doc(req.params.id).collection('invitedUsers'), 15)
+    // await db.collection('meetings_testing').doc(req.params.id).delete()
 })
+
+async function deleteCollection(collectionRef, batchSize) {
+
+    const query = collectionRef.orderBy('__name__').limit(batchSize);
+
+    return new Promise((resolve, reject) => {
+        deleteQueryBatch(query, resolve).catch(reject);
+    });
+}
+
+async function deleteQueryBatch(query, resolve) {
+    const snapshot = await query.get();
+
+    const batchSize = snapshot.size;
+    if (batchSize === 0) {
+        // When there are no documents left, we are done
+        resolve();
+        return;
+    }
+
+    // Delete documents in a batch
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    // Recurse on the next process tick, to avoid
+    // exploding the stack.
+    process.nextTick(() => {
+        deleteQueryBatch(query, resolve);
+    });
+}
 
 module.exports = router;
