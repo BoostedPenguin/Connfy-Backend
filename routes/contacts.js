@@ -1,50 +1,39 @@
-var express = require('express');
+const express = require('express');
 const db = require('../db');
-var router = express.Router();
+const admin = require('firebase-admin');
+const checkIfAuthenticated = require('../middlewares/authentication_middleware')
+const router = express.Router();
 
-//adds contacts to userID
-router.get('/add', async (req, res, next) => {
-    const userUID = "asdjawdjawdg"
-    const user2UID = "rgasdasdzas"
-    const user3UID = "hcvbsdfyjrt"
+//adds contacts to user
+router.post('/add', checkIfAuthenticated, async (req, res) => {
+    const userId = req.authId;
+    const arrayUnion = admin.firestore.FieldValue.arrayUnion;
 
-    var contact1 = await db.collection('users_testing').doc(user2UID).get();
-    var contact2 = await db.collection('users_testing').doc(user3UID).get();
-
-    await db.collection('users_testing').doc(userUID).collection('contacts').doc(user2UID).set({
-        name: contact1.data().name
-    });
-
-    await db.collection('users_testing').doc(userUID).collection('contacts').doc(user3UID).set({
-        name: contact2.data().name
+    await db.collection('users').doc(userId).update({
+        contacts: arrayUnion(req.body[0])
     });
 
     res.send("done");
 });
 
-//returns an array of contacts userUID for a specific user
-router.get('/', async (req, res, next) => {
-    const userUID = "asdjawdjawdg"
-
-    var contacts = [];
-
-    const contactsRef = db.collection('users_testing').doc(userUID).collection('contacts');
-    const snapshot = await contactsRef.get();
-
-    snapshot.forEach(doc => {
-        console.log(doc.id, '=>', doc.data());
-        contacts.push(doc.id);
-    });
-
-    res.send(contacts);
+//returns an array of a user's contacts
+router.get('/', checkIfAuthenticated, async (req, res) => {
+    const userId = req.authId;
+    const contacts = (await db.collection('users').doc(userId).get()).data().contacts;
+    if (contacts.length > 0)
+        res.send(contacts);
+    else
+        res.status(204).send();
 });
 
 //deletes contact from user
-router.get('/delete', async (req, res, next) => {
-    const userUID = "asdjawdjawdg"
-    const user2UID = "rgasdasdzas"
+router.post('/delete', checkIfAuthenticated, async (req, res) => {
+    const userId = req.authId;
+    const arrayRemove = admin.firestore.FieldValue.arrayRemove;
 
-    await db.collection('users_testing').doc(userUID).collection('contacts').doc(user2UID).delete();
+    await db.collection('users').doc(userId).update({
+        contacts: arrayRemove(req.body[0])
+    });
 
     res.send("deleted");
 });
