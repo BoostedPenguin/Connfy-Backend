@@ -97,12 +97,27 @@ router.put('/update/:id', async (req, res, next) =>{
             res.send('Not Authorized to access this meeting')
         }
     }else{
-        res.send('No Result Found')
+        res.sendStatus(404)
     }
 });
 
 //Delete a Meeting
 router.delete('/delete/:id', async (req, res, next) =>{
+    const query = db.collection('meetings').doc(req.params.id);
+    const querySnapshot = await query.get();
+
+    if(querySnapshot.exists){
+        let invitedUsers = querySnapshot.data().invitedUsers
+        invitedUsers.push(querySnapshot.data().ownerUID)
+        for (const user of invitedUsers) {
+                await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayRemove(req.params.id)})
+        }
+        await query.delete()
+        res.send('Meeting Deleted!')
+    }else{
+        res.sendStatus(404)
+    }
+
 })
 
 
