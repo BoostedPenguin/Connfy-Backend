@@ -20,10 +20,37 @@ router.post('/add', checkIfAuthenticated, async (req, res) => {
 router.get('/', checkIfAuthenticated, async (req, res) => {
     const userId = req.authId;
     const contacts = (await db.collection('users').doc(userId).get()).data().contacts;
-    if (contacts.length > 0)
-        res.send(contacts);
-    else
-        res.status(204).send();
+    try {
+        if (contacts.length > 0) {
+
+            let userData = []
+
+
+            await Promise.all(contacts.map(async (userId) => {
+                let userDoc = await db.collection('users').doc(userId).get()
+
+                let ssh = {
+                    uid: userDoc.id,
+                    hasOutlook: userDoc.data().hasOutlook,
+                    name: userDoc.data().name,
+                    email: userDoc.data().email,
+                }
+
+                userData.push(ssh)
+            }))
+
+
+            const data = {
+                data: userData,
+                status: 200,
+            }
+            res.status(200).send(data);
+        }
+        else
+            res.status(204).send();
+    } catch (e) {
+        res.status(404).send(e);
+    };
 });
 
 //deletes contact from user
