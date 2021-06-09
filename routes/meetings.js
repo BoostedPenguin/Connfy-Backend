@@ -6,7 +6,7 @@ var checkIfAuthenticated = require('../middlewares/authentication_middleware');
 
 //Get All Meetings
 router.get('/', checkIfAuthenticated, async (req, res, next) => {
-    const query = db.collection('users').doc("4jEjIVIawXVwduXTLc7s");
+    const query = db.collection('users').doc(req.authId);
     const querySnapshot = await query.get();
 
     if(querySnapshot.exists){
@@ -17,7 +17,7 @@ router.get('/', checkIfAuthenticated, async (req, res, next) => {
 });
 
 //Get Meeting by ID
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', checkIfAuthenticated, async (req, res, next) => {
     const query = db.collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
 
@@ -30,7 +30,7 @@ router.get('/:id', async (req, res, next) => {
                     meetingData: result
                 }
 
-         if(data.meetingData.invitedUsers.includes("4jEjIVIawXVwduXTLc7s") || data.meetingData.ownerUID === "4jEjIVIawXVwduXTLc7s"){
+         if(data.meetingData.invitedUsers.includes(req.authId) || data.meetingData.ownerUID === req.authId){
             res.send(data)
          }else{
             res.send('Not Authorized to access this meeting')
@@ -41,7 +41,7 @@ router.get('/:id', async (req, res, next) => {
 });
 
 //Adding a new Meeting
-router.post('/add', async (req, res, next) => {
+router.post('/add', checkIfAuthenticated, async (req, res, next) => {
     const data = {
         meetingDetails: {
             title : req.body.title,
@@ -62,7 +62,7 @@ router.post('/add', async (req, res, next) => {
 });
 
 //Update a Meeting
-router.put('/update/:id', async (req, res, next) =>{
+router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
     const query = db.collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
 
@@ -70,7 +70,7 @@ router.put('/update/:id', async (req, res, next) =>{
         let result = querySnapshot.data();
         let invitedUsers = result.invitedUsers;
 
-        if(result.ownerUID === "4jEjIVIawXVwduXTLc7s"){ //req.authId
+        if(result.ownerUID === req.authId){
             const data = {
                 meetingDetails: {
                     title : req.body.title,
@@ -102,7 +102,7 @@ router.put('/update/:id', async (req, res, next) =>{
 });
 
 //Delete a Meeting
-router.delete('/delete/:id', async (req, res, next) =>{
+router.delete('/delete/:id', checkIfAuthenticated, async (req, res, next) =>{
     const query = db.collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
 
