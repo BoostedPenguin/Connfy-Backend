@@ -30,9 +30,9 @@ router.get('/:id', async (req, res, next) => {
                     meetingData: result
                 }
 
-        if(data.meetingData.invitedUsers.includes("4jEjIVIawXVwduXTLc7s") || data.meetingData.ownerUID === "4jEjIVIawXVwduXTLc7s"){
+         if(data.meetingData.invitedUsers.includes("4jEjIVIawXVwduXTLc7s") || data.meetingData.ownerUID === "4jEjIVIawXVwduXTLc7s"){
             res.send(data)
-        }else{
+         }else{
             res.send('Not Authorized to access this meeting')
         }
     }else{
@@ -62,47 +62,39 @@ router.post('/add', async (req, res, next) => {
 });
 
 //Update a Meeting
-router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
-    const query = db.collection('users_testing').doc(req.authId).collection('meetings').doc(req.params.id);
+router.put('/update/:id', async (req, res, next) =>{
+    const query = db.collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
 
     if(querySnapshot.exists){
         let result = querySnapshot.data();
+        let invitedUsers = result.invitedUsers;
 
-        if(result.ownerUID === req.authId){
+        if(result.ownerUID === "4jEjIVIawXVwduXTLc7s"){ //req.authId
             const data = {
                 meetingDetails: {
                     title : req.body.title,
-                    description : req.body.description,
                     ownerUID : req.body.ownerUID,
                     ownerName : req.body.ownerName,
-                    time : req.body.time,
-                    geoLocation : req.body.geoLocation
-                },
-                invitedUsers: req.body.invitedUsers
+                    date : admin.firestore.FieldValue.serverTimestamp(),
+                    geoLocation : req.body.geoLocation,
+                    invitedUsers: req.body.invitedUsers
+                }
             }
-           await db.collection('meetings_testing').doc(req.params.id).set(data.meetingDetails)
+            await db.collection('meetings').doc(req.params.id).set(data.meetingDetails)
 
-            await Promise.all(data.invitedUsers.map(async (uid) => {
-                var userSnapshot = await db.collection('users_testing').doc(uid).get()
-                await db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers').doc(uid).set({name:userSnapshot.data().name})
-            }))
+            for (const user of invitedUsers) {
+                if(!data.meetingDetails.invitedUsers.includes(user)){
+                    await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayRemove(req.params.id)})
+                }
+            }
 
-            data.invitedUsers.push(data.meetingDetails.ownerUID);
-
-            await Promise.all(data.invitedUsers.map(async (uid) => {
-                await db.collection('users_testing').doc(uid).collection('meetings').doc(req.params.id).set(data.meetingDetails);
-
-                await Promise.all(data.invitedUsers.map(async (uid1) => {
-                    var userSnapshot = await db.collection('users_testing').doc(uid1).get();
-                    await db.collection('users_testing').doc(uid).collection('meetings').doc(req.params.id).collection('invitedUsers').doc(uid1).set({
-                        name: userSnapshot.data().name
-                    })
-                }))
-            }))
+            for (const user of data.meetingDetails.invitedUsers) {
+                await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayUnion(req.params.id)})
+            }
             res.send('Meeting Updated!')
         }else{
-            res.send('Not Authorized to modify this meeting')
+            res.send('Not Authorized to access this meeting')
         }
     }else{
         res.send('No Result Found')
@@ -111,50 +103,7 @@ router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
 
 //Delete a Meeting
 router.delete('/delete/:id', async (req, res, next) =>{
-    const userMeetingsSnapshot = await db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers').get()
-    await Promise.all(
-        userMeetingsSnapshot.forEach(async (uid)=>{
-            await deleteCollection(db.collection('users_testing').doc(uid.id).collection('meetings').doc(req.params.id).collection('invitedUsers'), 15)
-            await db.collection('users_testing').doc(uid.id).collection('meetings').doc(req.params.id).delete()
-        })
-    )
-    await deleteCollection(db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers'), 15)
-    await db.collection('meetings_testing').doc(req.params.id).delete()
-    await deleteCollection(db.collection('users_testing').doc(req.params.id).collection('invitedUsers'), 15)
-    await db.collection('meetings_testing').doc(req.params.id).delete()
 })
 
-async function deleteCollection(collectionRef, batchSize) {
-
-    const query = collectionRef.orderBy('__name__').limit(batchSize);
-
-    return new Promise((resolve, reject) => {
-        deleteQueryBatch(query, resolve).catch(reject);
-    });
-}
-
-async function deleteQueryBatch(query, resolve) {
-    const snapshot = await query.get();
-
-    const batchSize = snapshot.size;
-    if (batchSize === 0) {
-        // When there are no documents left, we are done
-        resolve();
-        return;
-    }
-
-    // Delete documents in a batch
-    const batch = db.batch();
-    snapshot.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-    });
-    await batch.commit();
-
-    // Recurse on the next process tick, to avoid
-    // exploding the stack.
-    process.nextTick(() => {
-        deleteQueryBatch(query, resolve);
-    });
-}
 
 module.exports = router;
