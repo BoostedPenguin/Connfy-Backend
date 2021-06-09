@@ -22,8 +22,8 @@ router.post('/add', checkIfAuthenticated, async (req, res) => {
 //returns an array of a user's contacts
 router.get('/', checkIfAuthenticated, async (req, res) => {
     const userId = req.authId;
-    const contacts = (await db.collection('users').doc(userId).get()).data().contacts;
     try {
+        const contacts = (await db.collection('users').doc(userId).get()).data().contacts;
         if (contacts.length > 0)
             res.send(contacts);
         else
