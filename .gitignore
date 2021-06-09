@@ -14,3 +14,4 @@ build
 
 node_modules
 connfy_firebase_cred.json
+.idea
