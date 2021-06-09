@@ -1,32 +1,25 @@
 var express  = require('express')
 const db = require('../db')
 var router = express.Router()
+var admin  = require('firebase-admin')
 var checkIfAuthenticated = require('../middlewares/authentication_middleware');
 
 //Get All Meetings
 router.get('/', checkIfAuthenticated, async (req, res, next) => {
-    const query = db.collection('users_testing').doc(req.authId).collection('meetings');
+    const query = db.collection('users').doc("4jEjIVIawXVwduXTLc7s");
     const querySnapshot = await query.get();
 
-    let result = [];
-
-    if(querySnapshot.size > 0){
-        querySnapshot.forEach(doc =>{
-            console.log(doc.id + '=>' + doc.data());
-            result.push(doc.id, doc.data());
-        });
-        res.send(result);
+    if(querySnapshot.exists){
+        res.send(querySnapshot.data());
     }else{
         res.send('No Meetings Found for current user')
     }
 });
 
 //Get Meeting by ID
-router.get('/:id', checkIfAuthenticated, async (req, res, next) => {
-    const query = db.collection('users_testing').doc(req.authId).collection('meetings').doc(req.params.id);
+router.get('/:id', async (req, res, next) => {
+    const query = db.collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
-    const query1 = db.collection('users_testing').doc(req.authId).collection('meetings').doc(req.params.id).collection('invitedUsers');
-    const querySnapshot1 = await query1.get();
 
     if(querySnapshot.exists){
             let result_id = querySnapshot.id
@@ -34,13 +27,10 @@ router.get('/:id', checkIfAuthenticated, async (req, res, next) => {
 
         const data = {
                     id: result_id,
-                    meetingData: result,
-                    invitedUsers: []
+                    meetingData: result
                 }
-        querySnapshot1.forEach(uid=>{
-            data.invitedUsers.push(uid.id, uid.data())
-        })
-        if(data.invitedUsers.includes(req.authId) || data.meetingData.ownerUID === req.authId){
+
+        if(data.meetingData.invitedUsers.includes("4jEjIVIawXVwduXTLc7s") || data.meetingData.ownerUID === "4jEjIVIawXVwduXTLc7s"){
             res.send(data)
         }else{
             res.send('Not Authorized to access this meeting')
@@ -51,37 +41,23 @@ router.get('/:id', checkIfAuthenticated, async (req, res, next) => {
 });
 
 //Adding a new Meeting
-router.post('/add', checkIfAuthenticated, async (req, res, next) => {
+router.post('/add', async (req, res, next) => {
     const data = {
         meetingDetails: {
             title : req.body.title,
-            description : req.body.description,
             ownerUID : req.body.ownerUID,
             ownerName : req.body.ownerName,
-            time : req.body.time,
-            geoLocation : req.body.geoLocation
-        },
-        invitedUsers: req.body.invitedUsers
+            date : admin.firestore.FieldValue.serverTimestamp(),
+            geoLocation : req.body.geoLocation,
+            invitedUsers: req.body.invitedUsers
+        }
     }
-    const querySnapshot = await db.collection('meetings_testing').add(data.meetingDetails)
+    const meetingsQuerySnapshot = await db.collection('meetings').add(data.meetingDetails);
+    await db.collection('users').doc(data.meetingDetails.ownerUID).update({meetings: admin.firestore.FieldValue.arrayUnion(meetingsQuerySnapshot.id)});
 
-    await Promise.all(data.invitedUsers.map(async (uid) => {
-        var userSnapshot = await db.collection('users_testing').doc(uid).get()
-        await db.collection('meetings_testing').doc(querySnapshot.id).collection('invitedUsers').doc(uid).set({name:userSnapshot.data().name})
-    }))
-
-    data.invitedUsers.push(data.meetingDetails.ownerUID);
-
-    await Promise.all(data.invitedUsers.map(async (uid) => {
-        await db.collection('users_testing').doc(uid).collection('meetings').doc(querySnapshot.id).set(data.meetingDetails);
-
-        await Promise.all(data.invitedUsers.map(async (uid1) => {
-            var userSnapshot = await db.collection('users_testing').doc(uid1).get();
-            await db.collection('users_testing').doc(uid).collection('meetings').doc(querySnapshot.id).collection('invitedUsers').doc(uid1).set({
-                name: userSnapshot.data().name
-            })
-        }))
-    }))
+    for (const user of data.meetingDetails.invitedUsers) {
+        await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayUnion(meetingsQuerySnapshot.id)})
+    }
     res.send("Created New Meeting")
 });
 
@@ -135,17 +111,17 @@ router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
 
 //Delete a Meeting
 router.delete('/delete/:id', async (req, res, next) =>{
-    // const userMeetingsSnapshot = await db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers').get()
-    // await Promise.all(
-    //     userMeetingsSnapshot.forEach(async (uid)=>{
-    //         await deleteCollection(db.collection('users_testing').doc(uid.id).collection('meetings').doc(req.params.id).collection('invitedUsers'), 15)
-    //         await db.collection('users_testing').doc(uid.id).collection('meetings').doc(req.params.id).delete()
-    //     })
-    // )
-    // await deleteCollection(db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers'), 15)
-    // await db.collection('meetings_testing').doc(req.params.id).delete()
-    // await deleteCollection(db.collection('users_testing').doc(req.params.id).collection('invitedUsers'), 15)
-    // await db.collection('meetings_testing').doc(req.params.id).delete()
+    const userMeetingsSnapshot = await db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers').get()
+    await Promise.all(
+        userMeetingsSnapshot.forEach(async (uid)=>{
+            await deleteCollection(db.collection('users_testing').doc(uid.id).collection('meetings').doc(req.params.id).collection('invitedUsers'), 15)
+            await db.collection('users_testing').doc(uid.id).collection('meetings').doc(req.params.id).delete()
+        })
+    )
+    await deleteCollection(db.collection('meetings_testing').doc(req.params.id).collection('invitedUsers'), 15)
+    await db.collection('meetings_testing').doc(req.params.id).delete()
+    await deleteCollection(db.collection('users_testing').doc(req.params.id).collection('invitedUsers'), 15)
+    await db.collection('meetings_testing').doc(req.params.id).delete()
 })
 
 async function deleteCollection(collectionRef, batchSize) {
