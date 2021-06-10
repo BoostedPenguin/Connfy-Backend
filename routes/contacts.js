@@ -21,7 +21,6 @@ router.get('/', checkIfAuthenticated, async (req, res) => {
     const userId = req.authId;
     const contacts = (await db.collection('users').doc(userId).get()).data().contacts;
     try {
-        if (contacts.length > 0) {
 
             let userData = []
 
@@ -42,12 +41,8 @@ router.get('/', checkIfAuthenticated, async (req, res) => {
 
             const data = {
                 data: userData,
-                status: 200,
             }
             res.status(200).send(data);
-        }
-        else
-            res.status(204).send();
     } catch (e) {
         res.status(404).send(e);
     };
