@@ -7,6 +7,7 @@ const router = express.Router();
 // On person registration add him to firestore 
 router.post('/create', checkIfAuthenticated, async (req, res) => {
     const userId = req.authId;
+    console.log("Wtf")
 
     const docRef = await db.collection('users').doc(userId).get()
 
@@ -20,23 +21,10 @@ router.post('/create', checkIfAuthenticated, async (req, res) => {
         meetings: [],
         contacts: [],
         date : admin.firestore.FieldValue.serverTimestamp(),
-    }).then();
+    });
 
-    const userObj = await db.collection('users').doc(userId).get()
-    const userData = userObj.data()
-
-    const data = {
-        uid: userObj.id,
-        name: userData.name,
-        hasOutlook: userData.hasOutlook,
-        meetings: userData.meetings,
-        contacts: userData.contacts,
-        date : userData.date,
-    }
-
-    res.send({data: data});
+    res.send()
 });
-
 
 // On person registration add him to firestore 
 router.get('/', checkIfAuthenticated, async (req, res) => {
