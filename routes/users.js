@@ -10,7 +10,7 @@ router.post('/create', checkIfAuthenticated, async (req, res) => {
 
     const docRef = await db.collection('users').doc(userId).get()
 
-    if(doc.exists) {
+    if(docRef.exists) {
         db.collection('users').doc(userId).delete()
     }
 
