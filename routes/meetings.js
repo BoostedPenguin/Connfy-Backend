@@ -6,11 +6,12 @@ let checkIfAuthenticated = require('../middlewares/authentication_middleware');
 
 //Get All Meetings
 router.get('/', checkIfAuthenticated, async (req, res, next) => {
-    const allUserMeetingsRef = db.collection('users').doc(req.authId);
+const allUserMeetingsRef = db.collection('users').doc(req.authId);
     const allUserMeetingsSnapshot = await allUserMeetingsRef.get();
 
     if(allUserMeetingsSnapshot.exists){
         let allMeetings = [];
+
         for (const meeting of allUserMeetingsSnapshot.data().meetings) {
             const snapshot = await db.collection('meetings').doc(meeting).get();
             const meetingData = {
@@ -62,12 +63,15 @@ router.post('/add', checkIfAuthenticated, async (req, res, next) => {
         }
     };
     const meetingsQuerySnapshot = await db.collection('meetings').add(data.meetingDetails);
-    await db.collection('users').doc(data.meetingDetails.ownerUID).update({meetings: admin.firestore.FieldValue.arrayUnion(meetingsQuerySnapshot.id)});
-
-    for (const user of data.meetingDetails.invitedUsers) {
-        await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayUnion(meetingsQuerySnapshot.id)});
+    if(await addUsers(data.meetingDetails.invitedUsers, meetingsQuerySnapshot.id)){
+        await db.collection('users').doc(data.meetingDetails.ownerUID).update({meetings: admin.firestore.FieldValue.arrayUnion(meetingsQuerySnapshot.id)});
+        res.send(data);
+    }else{
+        await db.collection('meetings').add(data.meetingDetails);
+        res.send("Error while adding users").status(500);
     }
-    res.send("Created New Meeting");
+
+
 });
 
 //Update a Meeting
@@ -84,7 +88,7 @@ router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
                 title : result.title,
                 ownerName : result.ownerName,
                 ownerUID: req.authId,
-                date : admin.firestore.FieldValue.serverTimestamp(),
+                date : result.date,
                 geoLocation : result.geoLocation,
                 invitedUsers: result.invitedUsers
             }
@@ -135,5 +139,31 @@ router.delete('/delete/:id', checkIfAuthenticated, async (req, res, next) =>{
 
 })
 
+
+async function addUsers(invitedUsers, meetingId){
+    if(Array.isArray(invitedUsers)){
+        await Promise.all(invitedUsers.map(async (user) => {
+            if((await db.collection('users').doc(user).get()).exists){
+                await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayUnion(meetingId)})
+            }
+        }))
+        return true;
+    }else{
+        return false;
+    }
+}
+async function removeUsers(usersToBeRemoved, meetingId){
+    if(Array.isArray(usersToBeRemoved)){
+        await Promise.all(usersToBeRemoved.map(async (user) => {
+            let userSnapshot = await db.collection('users').doc(user).get();
+            if(userSnapshot.exists && userSnapshot.data().meetings && userSnapshot.data().meetings.includes(meetingId)){
+                await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayRemove(meetingId)})
+            }
+        }))
+        return true;
+    }else{
+        return false;
+    }
+}
 
 module.exports = router;
