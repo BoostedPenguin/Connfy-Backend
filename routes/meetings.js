@@ -79,17 +79,23 @@ router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
         let result = querySnapshot.data();
         let invitedUsers = result.invitedUsers;
 
+        let data = {
+            meetingDetails: {
+                title : result.title,
+                ownerName : result.ownerName,
+                ownerUID: req.authId,
+                date : admin.firestore.FieldValue.serverTimestamp(),
+                geoLocation : result.geoLocation,
+                invitedUsers: result.invitedUsers
+            }
+        }
+
         if(result.ownerUID === req.authId){
-            const data = {
-                meetingDetails: {
-                    title : req.body.title,
-                    ownerName : req.body.ownerName,
-                    ownerUID: req.authId,
-                    date : admin.firestore.FieldValue.serverTimestamp(),
-                    geoLocation : req.body.geoLocation,
-                    invitedUsers: req.body.invitedUsers
-                }
-            };
+            if(req.body.title !== undefined) data.meetingDetails.title = req.body.title;
+            if(req.body.ownerName !== undefined) data.meetingDetails.title = req.body.ownerName;
+            if(req.body.geoLocation !== undefined) data.meetingDetails.title = req.body.geoLocation;
+            if(req.body.invitedUsers !== undefined) data.meetingDetails.title = req.body.invitedUsers;
+
             await db.collection('meetings').doc(req.params.id).set(data.meetingDetails);
 
             for (const user of invitedUsers) {
