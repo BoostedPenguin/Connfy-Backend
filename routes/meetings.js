@@ -70,8 +70,6 @@ router.post('/add', checkIfAuthenticated, async (req, res, next) => {
         await db.collection('meetings').add(data.meetingDetails);
         res.send("Error while adding users").status(500);
     }
-
-
 });
 
 //Update a Meeting
@@ -96,22 +94,25 @@ router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
 
         if(result.ownerUID === req.authId){
             if(req.body.title !== undefined) data.meetingDetails.title = req.body.title;
-            if(req.body.ownerName !== undefined) data.meetingDetails.title = req.body.ownerName;
-            if(req.body.geoLocation !== undefined) data.meetingDetails.title = req.body.geoLocation;
-            if(req.body.invitedUsers !== undefined) data.meetingDetails.title = req.body.invitedUsers;
+            if(req.body.ownerName !== undefined) data.meetingDetails.ownerName = req.body.ownerName;
+            if(req.body.geoLocation !== undefined) data.meetingDetails.geoLocation = req.body.geoLocation;
+            if(req.body.invitedUsers !== undefined) data.meetingDetails.invitedUsers = req.body.invitedUsers;
 
             await db.collection('meetings').doc(req.params.id).set(data.meetingDetails);
 
+            if(await addUsers(data.meetingDetails.invitedUsers, req.params.id)){
+                await db.collection('users').doc(data.meetingDetails.ownerUID).update({meetings: admin.firestore.FieldValue.arrayUnion(req.params.id)});
+                res.send(data);
+            }else{
+                await db.collection('meetings').add(data.meetingDetails);
+                res.send("Error while adding users").status(500);
+            }
             for (const user of invitedUsers) {
                 if(!data.meetingDetails.invitedUsers.includes(user)){
                     await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayRemove(req.params.id)});
                 }
             }
-
-            for (const user of data.meetingDetails.invitedUsers) {
-                await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayUnion(req.params.id)});
-            }
-            res.send('Meeting Updated!');
+            res.send(data);
         }else{
             res.sendStatus(403);
         }
@@ -125,20 +126,28 @@ router.delete('/delete/:id', checkIfAuthenticated, async (req, res, next) =>{
     const query = db.collection('meetings').doc(req.params.id);
     const querySnapshot = await query.get();
 
-    if(querySnapshot.exists){
-        let invitedUsers = querySnapshot.data().invitedUsers;
-        invitedUsers.push(req.authId);
-        for (const user of invitedUsers) {
+    const ownerQuery = db.collection('meetings').doc(req.params.id)
+    const ownerSnapshot = await ownerQuery.get()
+
+
+    if(ownerSnapshot.data().ownerUID === req.authId){
+        if(querySnapshot.exists){
+            let invitedUsers = querySnapshot.data().invitedUsers;
+            invitedUsers.push(req.authId);
+            for (const user of invitedUsers) {
                 await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayRemove(req.params.id)});
+            }
+            await query.delete();
+            res.send('Meeting Deleted!');
+        }else{
+            res.sendStatus(404);
         }
-         await query.delete();
-        res.send('Meeting Deleted!');
     }else{
-        res.sendStatus(404);
+        res.sendStatus(403);
     }
 
-})
 
+})
 
 async function addUsers(invitedUsers, meetingId){
     if(Array.isArray(invitedUsers)){
@@ -152,18 +161,4 @@ async function addUsers(invitedUsers, meetingId){
         return false;
     }
 }
-async function removeUsers(usersToBeRemoved, meetingId){
-    if(Array.isArray(usersToBeRemoved)){
-        await Promise.all(usersToBeRemoved.map(async (user) => {
-            let userSnapshot = await db.collection('users').doc(user).get();
-            if(userSnapshot.exists && userSnapshot.data().meetings && userSnapshot.data().meetings.includes(meetingId)){
-                await db.collection('users').doc(user).update({meetings: admin.firestore.FieldValue.arrayRemove(meetingId)})
-            }
-        }))
-        return true;
-    }else{
-        return false;
-    }
-}
-
 module.exports = router;
