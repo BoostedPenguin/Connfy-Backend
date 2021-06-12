@@ -9,6 +9,9 @@ var exampleRouter = require('./routes/example');
 var contactsRouter = require('./routes/contacts')
 var usersRouter = require('./routes/users')
 var meetingRouter =  require('./routes/meetings')
+var meetingRouter =  require('./routes/meetings')
+var contactsRouter = require('./routes/contacts')
+var usersRouter = require('./routes/users')
 
 var app = express();
 
