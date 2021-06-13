@@ -20,11 +20,15 @@ const allUserMeetingsRef = db.collection('users').doc(req.authId);
                 ownerName: snapshot.data().ownerName,
                 invitedUsersIds: snapshot.data().invitedUsers,
                 geoLocation: snapshot.data().geoLocation,
-                title: snapshot.data().title
+                title: snapshot.data().title,
+                isOutlook: snapshot.data().isOutlook,
+                date: snapshot.data().date
             };
 
             allMeetings.push(meetingData);
         }
+        allMeetings.sort((a, b) => (a.date.seconds > b.date.seconds) ? 1 : -1)
+
         res.send({data:  allMeetings});
     }else{
         res.sendStatus(204);
@@ -45,7 +49,8 @@ router.post('/add', checkIfAuthenticated, async (req, res, next) => {
             ownerName : req.body.ownerName,
             date : admin.firestore.FieldValue.serverTimestamp(),
             geoLocation : req.body.geoLocation,
-            invitedUsers: req.body.invitedUsers
+            invitedUsers: req.body.invitedUsers,
+            isOutlook: req.body.isOutlook
         }
     };
     const meetingsQuerySnapshot = await db.collection('meetings').add(data.meetingDetails);
@@ -74,7 +79,8 @@ router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
                 ownerUID: req.authId,
                 date : result.date,
                 geoLocation : result.geoLocation,
-                invitedUsers: result.invitedUsers
+                invitedUsers: result.invitedUsers,
+                isOutlook: result.isOutlook
             }
         }
 
@@ -144,11 +150,12 @@ async function getMeeting(req, res, id){
 
         const data = {
             uid: result_id,
-            ownerUid: req.authId,
+            ownerUid: result.ownerUID,
             ownerName: result.ownerName,
             invitedUsers: [],
             geoLocation: result.geoLocation,
-            title: result.title
+            title: result.title,
+            date: result.date
         };
 
         await Promise.all(result.invitedUsers.map(async (user) => {
