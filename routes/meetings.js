@@ -89,6 +89,8 @@ router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
             if(req.body.ownerName !== undefined) data.meetingDetails.ownerName = req.body.ownerName;
             if(req.body.geoLocation !== undefined) data.meetingDetails.geoLocation = req.body.geoLocation;
             if(req.body.invitedUsers !== undefined) data.meetingDetails.invitedUsers = req.body.invitedUsers;
+            if(req.body.invitedUsers !== undefined) data.meetingDetails.date = admin.firestore.Timestamp.fromMillis(req.body.date);
+
 
             await db.collection('meetings').doc(req.params.id).set(data.meetingDetails);
 
