@@ -47,12 +47,12 @@ router.post('/add', checkIfAuthenticated, async (req, res, next) => {
             title : req.body.title,
             ownerUID : req.authId,
             ownerName : req.body.ownerName,
-            date : admin.firestore.FieldValue.serverTimestamp(),
+            date : admin.firestore.Timestamp.fromMillis(req.body.date),
             geoLocation : req.body.geoLocation,
             invitedUsers: req.body.invitedUsers,
-            isOutlook: req.body.isOutlook
         }
     };
+    console.log(data)
     const meetingsQuerySnapshot = await db.collection('meetings').add(data.meetingDetails);
     if(await addUsers(data.meetingDetails.invitedUsers, meetingsQuerySnapshot.id)){
         await db.collection('users').doc(data.meetingDetails.ownerUID).update({meetings: admin.firestore.FieldValue.arrayUnion(meetingsQuerySnapshot.id)});
@@ -155,7 +155,7 @@ async function getMeeting(req, res, id){
             invitedUsers: [],
             geoLocation: result.geoLocation,
             title: result.title,
-            date: result.date
+            date: result.date._seconds * 1000
         };
 
         await Promise.all(result.invitedUsers.map(async (user) => {
