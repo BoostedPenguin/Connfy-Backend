@@ -13,6 +13,12 @@ router.post('/create', checkIfAuthenticated, async (req, res) => {
     const docRef = await db.collection('users').doc(userId).get()
 
     if(docRef.exists) {
+
+        if(docRef.data().email == undefined || docRef.data().email == "") {
+            await db.collection('users').doc(userId).set({
+                email: req.body.email
+            }, {merge: true})
+        }
         
         // Check if provider is google to avoid overriding data
         if(provider == "GOOGLE") {

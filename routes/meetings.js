@@ -174,7 +174,6 @@ async function getMeeting(req, res, id){
         })
 
         if(uid !== undefined || data.ownerUid === req.authId){
-            console.log({data: data})
             res.send({data: data});
         }else{
             res.sendStatus(403);
@@ -183,6 +182,29 @@ async function getMeeting(req, res, id){
         res.sendStatus(404);
     }
 }
+
+// router.post('/users/:id', checkIfAuthenticated, async (req, res, next) => {
+//     const meetingsQuerySnapshot = await db.collection('meetings').doc(req.params.id)
+    
+//     var meetingData = (await meetingsQuerySnapshot.get()).data()
+
+//     if(!meetingData.invitedUsers.includes(req.authId) && meetingData.ownerUID != req.authID) {
+//         return res.sendStatus(403)
+//     }
+
+//     meetingData.
+
+//     console.log(req.body.additonalUsers)
+
+//     await meetingsQuerySnapshot.update({
+//         invitedUsers : req.body.additonalUsers
+//     })
+
+//     await addUsers()
+
+//     await getMeeting(req, res)
+// })
+
 
 async function addUsers(invitedUsers, meetingId){
     if(Array.isArray(invitedUsers)){
