@@ -8,37 +8,47 @@ const router = express.Router();
 router.post('/create', checkIfAuthenticated, async (req, res) => {
     const userId = req.authId;
 
+    const provider = req.body.provider
+
     const docRef = await db.collection('users').doc(userId).get()
 
     if(docRef.exists) {
-        db.collection('users').doc(userId).delete()
+
+        if(docRef.data().email == undefined || docRef.data().email == "") {
+            await db.collection('users').doc(userId).set({
+                email: req.body.email
+            }, {merge: true})
+        }
+        
+        // Check if provider is google to avoid overriding data
+        if(provider == "GOOGLE") {
+            return res.send()
+        }
+        else {
+            db.collection('users').doc(userId).delete()
+        }
     }
 
-    await db.collection('users').doc(userId).set({
-        name: req.body.name ? req.body.name : "",
+
+    let insertingModel = {
         hasOutlook: false,
         meetings: [],
         contacts: [],
+        provider: provider,
         date : admin.firestore.FieldValue.serverTimestamp(),
-    }).then();
-
-    const userObj = await db.collection('users').doc(userId).get()
-    const userData = userObj.data()
-
-    const data = {
-        uid: userObj.id,
-        name: userData.name,
-        hasOutlook: userData.hasOutlook,
-        meetings: userData.meetings,
-        contacts: userData.contacts,
-        date : userData.date,
     }
 
-    res.send({data: data});
+    if(req.body.name) {
+        insertingModel.name = req.body.name
+    }
+
+    await db.collection('users').doc(userId).set(insertingModel)
+
+    res.send();
 });
 
 
-// On person registration add him to firestore 
+// Get basic user data on login
 router.get('/', checkIfAuthenticated, async (req, res) => {
     const userId = req.authId;
 

@@ -41,7 +41,7 @@ router.post('/add', checkIfAuthenticated, async (req, res) => {
     const arrayUnion = admin.firestore.FieldValue.arrayUnion;
     try {
         await db.collection('users').doc(userId).update({
-            contacts: arrayUnion(req.body[0])
+            contacts: arrayUnion(req.body.contact_uid)
         });
 
         await getContacts(req, res);
@@ -61,7 +61,7 @@ router.post('/delete', checkIfAuthenticated, async (req, res) => {
     const arrayRemove = admin.firestore.FieldValue.arrayRemove;
     try {
         await db.collection('users').doc(userId).update({
-            contacts: arrayRemove(req.body[0])
+            contacts: arrayRemove(req.body.contact_uid)
         });
 
         await getContacts(req, res);
