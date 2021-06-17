@@ -47,12 +47,12 @@ router.post('/add', checkIfAuthenticated, async (req, res, next) => {
             title : req.body.title,
             ownerUID : req.authId,
             ownerName : req.body.ownerName,
-            date : admin.firestore.FieldValue.serverTimestamp(),
+            date : admin.firestore.Timestamp.fromMillis(req.body.date),
             geoLocation : req.body.geoLocation,
             invitedUsers: req.body.invitedUsers,
-            isOutlook: req.body.isOutlook
         }
     };
+    console.log(data)
     const meetingsQuerySnapshot = await db.collection('meetings').add(data.meetingDetails);
     if(await addUsers(data.meetingDetails.invitedUsers, meetingsQuerySnapshot.id)){
         await db.collection('users').doc(data.meetingDetails.ownerUID).update({meetings: admin.firestore.FieldValue.arrayUnion(meetingsQuerySnapshot.id)});
@@ -89,6 +89,8 @@ router.put('/update/:id', checkIfAuthenticated, async (req, res, next) =>{
             if(req.body.ownerName !== undefined) data.meetingDetails.ownerName = req.body.ownerName;
             if(req.body.geoLocation !== undefined) data.meetingDetails.geoLocation = req.body.geoLocation;
             if(req.body.invitedUsers !== undefined) data.meetingDetails.invitedUsers = req.body.invitedUsers;
+            if(req.body.invitedUsers !== undefined) data.meetingDetails.date = admin.firestore.Timestamp.fromMillis(req.body.date);
+
 
             await db.collection('meetings').doc(req.params.id).set(data.meetingDetails);
 
@@ -155,7 +157,7 @@ async function getMeeting(req, res, id){
             invitedUsers: [],
             geoLocation: result.geoLocation,
             title: result.title,
-            date: result.date
+            date: result.date._seconds * 1000
         };
 
         await Promise.all(result.invitedUsers.map(async (user) => {
