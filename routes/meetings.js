@@ -157,7 +157,7 @@ async function getMeeting(req, res, id){
             invitedUsers: [],
             geoLocation: result.geoLocation,
             title: result.title,
-            date: result.date
+            date: result.date._seconds * 1000
         };
 
         await Promise.all(result.invitedUsers.map(async (user) => {
